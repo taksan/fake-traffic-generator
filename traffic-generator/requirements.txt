@@ -1,0 +1,6 @@
+Faker
+fastapi
+uvicorn[standard]
+requests
+pyyaml
+prometheus-client
