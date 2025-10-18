@@ -2,6 +2,7 @@ x-logging: &logging
   driver: gelf
   options:
     gelf-address: "udp://host.docker.internal:12201"
+    tag: traffic-generator
 services:
   # User Database Service
   user-database:
