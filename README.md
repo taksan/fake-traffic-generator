@@ -29,9 +29,20 @@ docker-compose down
 The services will be available at:
 - Traffic Generator API: http://localhost:8000
 - User Database API: http://localhost:8500
-- Server Assignment API: http://localhost:8600
+- Server Assignment API: http://localhost:8100
 
 You can customize the port mappings by creating a `.env` file (see `.env.example`).
+
+## Logging
+
+All services use the **GELF (Graylog Extended Log Format)** logging driver to send structured logs to a log aggregation system (e.g., Promtail/Loki or Logstash/Elasticsearch).
+
+- **Protocol**: GELF over UDP
+- **Port**: 12201
+- **Target**: `host.docker.internal:12201` (reaches the host's port 12201)
+- **Format**: JSON logs wrapped in GELF messages
+
+The GELF configuration is defined using a YAML anchor in `docker-compose.yml` for easy reuse across all services.
 
 ## Services
 
@@ -61,7 +72,7 @@ You can customize the port mappings by creating a `.env` file (see `.env.example
 - **Port**: 8500
 - **Purpose**: Manages up to 100 users for log generation
 - **Storage**: Persistent JSON file in Docker volume
-- **Logging**: Logs all requests to file for Filebeat collection
+- **Logging**: GELF logging to port 12201
 - **Endpoints**:
   - `GET /user/random` - Get or create a user
   - `GET /users` - List all users
@@ -70,10 +81,10 @@ You can customize the port mappings by creating a `.env` file (see `.env.example
 - **Documentation**: See [user-database/README.md](user-database/README.md)
 
 ### Server Assignment
-- **Port**: 8600
+- **Port**: 8100
 - **Purpose**: Assigns users to geographic servers based on location
 - **Features**: GeoJSON-based server mapping
-- **Logging**: Logs all assignments for analysis
+- **Logging**: GELF logging to port 12201
 
 ## Log Structure
 
@@ -282,8 +293,8 @@ The fake traffic generator system consists of three interconnected services:
 
 ```
 ┌─────────────────────────┐
-│   Traffic Generator     │ ──(stdout)──► JSON logs
-│  Port 8000 (API)        │
+│   Traffic Generator     │ ──(GELF UDP)──► Log Aggregator
+│  Port 8000 (API)        │    (port 12201)
 │  /metrics (Prometheus)  │
 └─────────────────────────┘
          │
@@ -291,9 +302,11 @@ The fake traffic generator system consists of three interconnected services:
          │    - GET /user/random
          │    - GET /users
          │    - GET /health
+         │    - GELF logging
          │
-         └──► Server Assignment (Port 8600)
+         └──► Server Assignment (Port 8100)
               - Geographic server mapping
+              - GELF logging
 ```
 
 ## Files
@@ -313,9 +326,18 @@ The fake traffic generator system consists of three interconnected services:
 
 ## Output Formats
 
-### JSON Logs (stdout)
+### GELF Logs (UDP)
 
-The traffic generator writes structured JSON logs to stdout. Each log entry follows a consistent schema with fields for HTTP requests, user information, and geographic data. These logs can be collected by any log aggregation system.
+The traffic generator sends structured JSON logs via GELF protocol to UDP port 12201. Each log entry follows a consistent schema with fields for HTTP requests, user information, and geographic data. The GELF messages include:
+
+- **short_message**: The JSON log entry as a string
+- **_container_name**: Container name (e.g., `traffic_generator`)
+- **_container_id**: Full container ID
+- **_tag**: Service tag (e.g., `traffic-generator`)
+- **level**: GELF severity level (6=INFO, 4=WARN, 3=ERROR)
+- **timestamp**: Unix timestamp
+
+These logs can be collected by any GELF-compatible log aggregation system (Promtail, Logstash, Graylog, etc.).
 
 ### Prometheus Metrics
 
@@ -346,16 +368,28 @@ These metrics can be scraped by any Prometheus-compatible monitoring system.
    docker-compose logs traffic-generator
    ```
 
-### No Logs Appearing
+3. Verify GELF endpoint is reachable:
+   ```bash
+   # Check if port 12201/udp is listening on the host
+   netstat -uln | grep 12201
+   ```
+
+### No Logs Appearing in Log Aggregator
 
 1. Verify traffic is running:
    ```bash
    curl http://localhost:8000/status
    ```
 
-2. Check container logs:
+2. Check if GELF messages are being sent:
    ```bash
-   docker-compose logs traffic-generator
+   # The container logs won't show JSON logs anymore (they go via GELF)
+   # Check the log aggregator (Promtail/Logstash) logs instead
+   ```
+
+3. Verify GELF endpoint connectivity:
+   ```bash
+   docker exec traffic_generator ping -c 1 host.docker.internal
    ```
 
 ### API Not Responding
