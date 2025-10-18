@@ -6,7 +6,7 @@ services:
     ports:
       - "${USER_DATABASE_PORT:-8500}:8500"
     networks:
-      - default
+      - ${NETWORK_NAME:-default}
     logging:
       driver: json-file
       options:
@@ -15,7 +15,7 @@ services:
         labels: "container,service"
     labels:
       container: "user-database"
-      service: "user-database"
+      service: "fake-traffic-generator"
     restart: unless-stopped
 
   # Server Assignment Service
@@ -25,7 +25,7 @@ services:
     ports:
       - "${SERVER_ASSIGNMENT_PORT:-8600}:8600"
     networks:
-      - default
+      - ${NETWORK_NAME:-default}
     logging:
       driver: json-file
       options:
@@ -34,7 +34,7 @@ services:
         labels: "container,service"
     labels:
       container: "server-assignment"
-      service: "server-assignment"
+      service: "fake-traffic-generator"
     restart: unless-stopped
 
   # Traffic Generator Application
@@ -50,7 +50,7 @@ services:
       - USER_DB_URL=${USER_DB_URL:-http://user-database:8500}
       - SERVER_ASSIGNMENT_URL=${SERVER_ASSIGNMENT_URL:-http://server-assignment:8600}
     networks:
-      - default
+      - ${NETWORK_NAME:-default}
     logging:
       driver: json-file
       options:
@@ -59,13 +59,8 @@ services:
         labels: "container,service"
     labels:
       container: "traffic-generator"
-      service: "traffic-generator"
+      service: "fake-traffic-generator"
     depends_on:
       - user-database
       - server-assignment
     restart: unless-stopped
-
-networks:
-  default:
-    name: ${NETWORK_NAME:-fake-traffic-generator}
-    driver: bridge
