@@ -1,11 +1,7 @@
-# Logging configuration (controlled by environment variables)
-x-logging: &logging-config
-  driver: ${LOGGING_DRIVER:-json-file}
+x-logging: &logging
+  driver: gelf
   options:
-    max-size: ${LOGGING_MAX_SIZE:-10m}
-    max-file: ${LOGGING_MAX_FILE:-3}
-    labels: ${LOGGING_LABELS:-container,service}
-
+    gelf-address: "udp://host.docker.internal:12201"
 services:
   # User Database Service
   user-database:
@@ -24,6 +20,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      <<: *logging
 
   # Server Assignment Service
   server-assignment:
@@ -43,6 +41,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      <<: *logging
 
   # Traffic Generator Application
   traffic-generator:
@@ -58,6 +58,8 @@ services:
       - SERVER_ASSIGNMENT_URL=http://server-assignment:8100
     networks:
       - ${NETWORK_NAME:-default}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       user-database:
         condition: service_started
@@ -65,7 +67,10 @@ services:
         condition: service_started
     restart: on-failure
     logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://localhost:12201"
-        tag: "traffic-generator"
+      <<: *logging
+
+volumes:
+  user_data:
+    driver: local
+  server_assignment_logs:
+    driver: local
