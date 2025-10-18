@@ -10,12 +10,35 @@ The fake traffic generator consists of three main services:
 2. **User Database** - Manages up to 100 users for log generation
 3. **Server Assignment** - Provides geographic server assignment based on user location
 
+## Quick Start
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f traffic-generator
+
+# Stop services
+docker-compose down
+```
+
+The services will be available at:
+- Traffic Generator API: http://localhost:8000
+- User Database API: http://localhost:8500
+- Server Assignment API: http://localhost:8600
+
+You can customize the port mappings by creating a `.env` file (see `.env.example`).
+
 ## Services
 
 ### Traffic Generator
-- **Port**: 8000 (Management API)
+- **Port**: 8000
 - **Purpose**: Generates realistic web application traffic and logs
-- **Log Format**: JSON with structured fields via GELF
+- **Log Format**: JSON with structured fields to stdout
 - **User Management**: Fetches users from User Database service
 - **User Flows**: Simulates realistic user journeys
   - Purchase flows
@@ -35,7 +58,7 @@ The fake traffic generator consists of three main services:
 - **API Documentation**: http://localhost:8000/docs
 
 ### User Database
-- **Port**: 8500 (API)
+- **Port**: 8500
 - **Purpose**: Manages up to 100 users for log generation
 - **Storage**: Persistent JSON file in Docker volume
 - **Logging**: Logs all requests to file for Filebeat collection
@@ -47,7 +70,7 @@ The fake traffic generator consists of three main services:
 - **Documentation**: See [user-database/README.md](user-database/README.md)
 
 ### Server Assignment
-- **Port**: 8100 (API)
+- **Port**: 8600
 - **Purpose**: Assigns users to geographic servers based on location
 - **Features**: GeoJSON-based server mapping
 - **Logging**: Logs all assignments for analysis
@@ -58,14 +81,16 @@ Each generated log entry contains:
 
 ```json
 {
-  "timestamp": "2025-10-15T19:00:00.000Z",
+  "timestamp": "2025-10-17T19:00:00.000000Z",
   "level": "INFO",
   "client_ip": "177.123.45.67",
-  "user_id": "user_42",
+  "user_id": 42,
+  "user_name": "John Doe",
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "http": {
     "request": {
       "method": "GET",
-      "referrer": "https://example.com"
+      "referrer": "https://example.com/previous/page"
     },
     "response": {
       "status_code": 200,
@@ -75,11 +100,26 @@ Each generated log entry contains:
     "version": "1.1"
   },
   "user_agent": {
-    "original": "Mozilla/5.0..."
+    "original": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36..."
   },
-  "message": "GET /products/example/1234 - 200"
+  "message": "GET /products/example/1234 - 200",
+  "geocode": {
+    "location": {
+      "lat": 43.6532,
+      "lon": -79.3832
+    },
+    "country_iso_code": "CA",
+    "country_name": "Canada",
+    "city_name": "Toronto"
+  },
+  "flow_name": "purchase"
 }
 ```
+
+**Note**: 
+- `geocode` field is always present with geographic information
+- `flow_name` field is present when the request is part of a user flow
+- `error` field is added for status codes >= 400
 
 ## Traffic Generator API
 
@@ -238,17 +278,22 @@ User flows are defined in the parent project's `user_flows.yml` file. Modify thi
 
 ## Architecture
 
-The traffic generator integrates with the ELK stack as follows:
+The fake traffic generator system consists of three interconnected services:
 
 ```
 ┌─────────────────────────┐
-│   Traffic Generator     │ ──(GELF/UDP)──► Logstash ──► Elasticsearch
+│   Traffic Generator     │ ──(stdout)──► JSON logs
 │  Port 8000 (API)        │
+│  /metrics (Prometheus)  │
 └─────────────────────────┘
          │
          ├──► User Database (Port 8500)
+         │    - GET /user/random
+         │    - GET /users
+         │    - GET /health
          │
-         └──► Server Assignment (Port 8100)
+         └──► Server Assignment (Port 8600)
+              - Geographic server mapping
 ```
 
 ## Files
@@ -266,28 +311,26 @@ The traffic generator integrates with the ELK stack as follows:
 - `server-assignment/` - Geographic server assignment service
 - Management scripts (*.sh) - Traffic control utilities
 
-## Integration with ELK Stack
+## Output Formats
 
-This traffic generator is designed to work with an ELK stack deployment. It sends logs via GELF (Graylog Extended Log Format) to Logstash, which processes and enriches them before storing in Elasticsearch.
+### JSON Logs (stdout)
 
-### Required Logstash Configuration
+The traffic generator writes structured JSON logs to stdout. Each log entry follows a consistent schema with fields for HTTP requests, user information, and geographic data. These logs can be collected by any log aggregation system.
 
-Ensure your Logstash pipeline has a GELF input configured:
+### Prometheus Metrics
 
-```ruby
-input {
-  gelf {
-    port => 12201
-    type => "gelf"
-  }
-}
-```
+The traffic generator exposes Prometheus-compatible metrics at the `/metrics` endpoint (port 8000):
 
-### Log Enrichment
+- `logs_generated_total` - Counter: Total logs generated
+- `http_requests_total` - Counter: HTTP requests by method and status code
+- `http_requests_by_location_total` - Counter: Requests by geographic location (country, city, coordinates)
+- `ddos_simulation_active` - Gauge: DDoS simulation status (0 or 1)
+- `ddos_simulation_remaining_seconds` - Gauge: Remaining seconds of DDoS simulation
+- `api_requests_total` - Counter: API requests by endpoint
+- `traffic_generation_interval_seconds` - Gauge: Current min/max intervals
+- `active_flows_total` - Gauge: Number of active user flows
 
-After Logstash processing, logs are enriched with:
-- `client.geo.*` - Geographic information (country, city, coordinates)
-- `user_agent.parsed.*` - Parsed browser and OS information
+These metrics can be scraped by any Prometheus-compatible monitoring system.
 
 ## Troubleshooting
 
@@ -310,9 +353,9 @@ After Logstash processing, logs are enriched with:
    curl http://localhost:8000/status
    ```
 
-2. Check if Logstash is receiving logs:
+2. Check container logs:
    ```bash
-   docker-compose logs logstash | grep "message"
+   docker-compose logs traffic-generator
    ```
 
 ### API Not Responding
@@ -322,7 +365,7 @@ After Logstash processing, logs are enriched with:
    docker-compose ps traffic-generator
    ```
 
-2. Check for port conflicts on 8000, 8100, or 8500
+2. Check for port conflicts on 8000, 8500, or 8600
 
 ## License
 

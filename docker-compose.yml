@@ -1,0 +1,71 @@
+services:
+  # User Database Service
+  user-database:
+    build: ./user-database
+    container_name: user-database
+    ports:
+      - "${USER_DATABASE_PORT:-8500}:8500"
+    networks:
+      - default
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "container,service"
+    labels:
+      container: "user-database"
+      service: "user-database"
+    restart: unless-stopped
+
+  # Server Assignment Service
+  server-assignment:
+    build: ./server-assignment
+    container_name: server-assignment
+    ports:
+      - "${SERVER_ASSIGNMENT_PORT:-8600}:8600"
+    networks:
+      - default
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "container,service"
+    labels:
+      container: "server-assignment"
+      service: "server-assignment"
+    restart: unless-stopped
+
+  # Traffic Generator Application
+  traffic-generator:
+    build: ./traffic-generator
+    container_name: traffic-generator
+    ports:
+      - "${TRAFFIC_GENERATOR_PORT:-8000}:8000"
+    volumes:
+      - ${USER_FLOWS_FILE:-./user_flows.yml}:/app/user_flows.yml:ro
+      - ${GEO_SERVERS_FILE:-./geo_servers.geojson}:/app/geo_servers.geojson:ro
+    environment:
+      - USER_DB_URL=${USER_DB_URL:-http://user-database:8500}
+      - SERVER_ASSIGNMENT_URL=${SERVER_ASSIGNMENT_URL:-http://server-assignment:8600}
+    networks:
+      - default
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "container,service"
+    labels:
+      container: "traffic-generator"
+      service: "traffic-generator"
+    depends_on:
+      - user-database
+      - server-assignment
+    restart: unless-stopped
+
+networks:
+  default:
+    name: ${NETWORK_NAME:-fake-traffic-generator}
+    driver: bridge
