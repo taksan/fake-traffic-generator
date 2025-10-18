@@ -1,66 +1,63 @@
 services:
   # User Database Service
   user-database:
-    build: ./user-database
-    container_name: user-database
+    build:
+      context: ./user-database
+    container_name: user_database
     ports:
-      - "${USER_DATABASE_PORT:-8500}:8500"
+      - "8500:8500"
+    volumes:
+      - user_data:/data
     networks:
       - ${NETWORK_NAME:-default}
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        labels: "container,service"
-    labels:
-      container: "user-database"
-      service: "fake-traffic-generator"
-    restart: unless-stopped
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8500/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Server Assignment Service
   server-assignment:
-    build: ./server-assignment
-    container_name: server-assignment
+    build:
+      context: ./server-assignment
+    container_name: server_assignment
     ports:
-      - "${SERVER_ASSIGNMENT_PORT:-8600}:8600"
+      - "8100:8100"
+    volumes:
+      - ../geo_servers.geojson:/app/geo_servers.geojson:ro
+      - server_assignment_logs:/var/log/server-assignment
     networks:
       - ${NETWORK_NAME:-default}
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        labels: "container,service"
-    labels:
-      container: "server-assignment"
-      service: "fake-traffic-generator"
-    restart: unless-stopped
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8100/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Traffic Generator Application
   traffic-generator:
-    build: ./traffic-generator
-    container_name: traffic-generator
+    build:
+      context: ./traffic-generator
+    container_name: traffic_generator
     ports:
-      - "${TRAFFIC_GENERATOR_PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
-      - ${USER_FLOWS_FILE:-./user_flows.yml}:/app/user_flows.yml:ro
-      - ${GEO_SERVERS_FILE:-./geo_servers.geojson}:/app/geo_servers.geojson:ro
+      - ../user_flows.yml:/app/user_flows.yml:ro
     environment:
-      - USER_DB_URL=${USER_DB_URL:-http://user-database:8500}
-      - SERVER_ASSIGNMENT_URL=${SERVER_ASSIGNMENT_URL:-http://server-assignment:8600}
+      - USER_DB_URL=http://user-database:8500
+      - SERVER_ASSIGNMENT_URL=http://server-assignment:8100
     networks:
       - ${NETWORK_NAME:-default}
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        labels: "container,service"
-    labels:
-      container: "traffic-generator"
-      service: "fake-traffic-generator"
     depends_on:
-      - user-database
-      - server-assignment
-    restart: unless-stopped
+      user-database:
+        condition: service_started
+      server-assignment:
+        condition: service_started
+    restart: on-failure
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://localhost:12201"
+        tag: "traffic-generator"
