@@ -14,7 +14,7 @@ fake = Faker()
 # Configuration
 DATA_DIR = '/data'
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
-LOGS_FILE = os.path.join(DATA_DIR, 'user_database.log')
+LOGS_FILE = os.path.join("/var/log/traffic-generator", 'user_database.log')
 MAX_USERS = 100
 
 # Ensure data directory exists

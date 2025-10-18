@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
 # Create log directory
-RUN mkdir -p /var/log/server-assignment
+RUN mkdir -p /var/log/traffic-generator
 
 # Expose API port
 EXPOSE 8100

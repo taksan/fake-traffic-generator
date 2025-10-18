@@ -13,6 +13,7 @@ services:
       - "8500:8500"
     volumes:
       - user_data:/data
+      - traffic_generator_logs:/var/log/traffic-generator
     networks:
       - ${NETWORK_NAME:-default}
     restart: on-failure
@@ -33,7 +34,7 @@ services:
       - "8100:8100"
     volumes:
       - ../geo_servers.geojson:/app/geo_servers.geojson:ro
-      - server_assignment_logs:/var/log/server-assignment
+      - traffic_generator_logs:/var/log/traffic-generator
     networks:
       - ${NETWORK_NAME:-default}
     restart: on-failure
@@ -73,5 +74,5 @@ services:
 volumes:
   user_data:
     driver: local
-  server_assignment_logs:
-    driver: local
+  traffic_generator_logs:
+

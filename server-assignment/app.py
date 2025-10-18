@@ -17,7 +17,7 @@ app = FastAPI(title="Server Assignment API", version="1.0.0")
 # Global state
 servers: List[Dict] = []
 assignments: Dict[str, Dict] = {}  # session_id -> assignment info
-ASSIGNMENT_LOG_FILE = "/var/log/server-assignment/assignments.log"
+ASSIGNMENT_LOG_FILE = "/var/log/traffic-generator/server-assignments.log"
 
 
 class ServerInfo(BaseModel):

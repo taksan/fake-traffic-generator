@@ -12,6 +12,7 @@ COPY app.py .
 
 # Create data directory
 RUN mkdir -p /data
+RUN mkdir -p /var/log/traffic-generator
 
 EXPOSE 8500
 
