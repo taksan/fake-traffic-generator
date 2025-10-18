@@ -1,7 +1,7 @@
 x-logging: &logging
   driver: gelf
   options:
-    gelf-address: "udp://host.docker.internal:12201"
+    gelf-address: "udp://localhost:12201"
     tag: traffic-generator
 services:
   # User Database Service
@@ -60,8 +60,6 @@ services:
       - SERVER_ASSIGNMENT_URL=http://server-assignment:8100
     networks:
       - ${NETWORK_NAME:-default}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       user-database:
         condition: service_started
