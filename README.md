@@ -35,7 +35,7 @@ You can customize the port mappings by creating a `.env` file (see `.env.example
 
 ## Logging
 
-All services use the **GELF (Graylog Extended Log Format)** logging driver to send structured logs to a log aggregation system (e.g., Promtail/Loki or Logstash/Elasticsearch).
+All services use the **GELF (Graylog Extended Log Format)** logging driver to send structured logs to a log aggregation system (e.g., Grafana Alloy/Loki or Logstash/Elasticsearch).
 
 - **Protocol**: GELF over UDP
 - **Port**: 12201
@@ -337,7 +337,7 @@ The traffic generator sends structured JSON logs via GELF protocol to UDP port 1
 - **level**: GELF severity level (6=INFO, 4=WARN, 3=ERROR)
 - **timestamp**: Unix timestamp
 
-These logs can be collected by any GELF-compatible log aggregation system (Promtail, Logstash, Graylog, etc.).
+These logs can be collected by any GELF-compatible log aggregation system (Grafana Alloy, Logstash, Graylog, etc.).
 
 ### Prometheus Metrics
 
@@ -384,7 +384,7 @@ These metrics can be scraped by any Prometheus-compatible monitoring system.
 2. Check if GELF messages are being sent:
    ```bash
    # The container logs won't show JSON logs anymore (they go via GELF)
-   # Check the log aggregator (Promtail/Logstash) logs instead
+   # Check the log aggregator (Alloy/Logstash) logs instead
    ```
 
 3. Verify GELF endpoint connectivity:
